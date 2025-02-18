@@ -15,7 +15,6 @@
 
     <script src="https://www.paypal.com/sdk/js?client-id=AYy6HZjrCWwMG1gzVsFCUgNZnuYFFtePVmAo8zgsk9syXLfkEGLdHjTazOh427K5_Vcn5-ZPbpLIy_IT"></script>
     <script>
-        // These values will be dynamically passed from your app
         const urlParams = new URLSearchParams(window.location.search);
         const email = urlParams.get("email");
         const amount = urlParams.get("amount");
@@ -24,7 +23,6 @@
         const baserowToken = urlParams.get("token");
 
         if (!email || !amount || !planName || !baserowTableID || !baserowToken) {
-            alert("Missing required parameters.");
             throw new Error("Missing required parameters.");
         }
 
@@ -33,13 +31,14 @@
                 return actions.order.create({
                     purchase_units: [{
                         amount: { value: amount }
-                    }]
+                    }],
+                    application_context: {
+                        shipping_preference: "NO_SHIPPING" // Removes billing address
+                    }
                 });
             },
             onApprove: function(data, actions) {
                 return actions.order.capture().then(function(details) {
-                    alert('Transaction completed by ' + details.payer.name.given_name + '!');
-
                     const workerURL = "https://paypal-payment-page.alexskeioslav.workers.dev/"; 
 
                     fetch(workerURL, {
@@ -53,20 +52,16 @@
                             table_id: baserowTableID,
                             token: baserowToken
                         })
-                    })
-                    .then(response => response.json())
-                    .then(data => console.log("Payment data sent:", data))
-                    .catch(error => console.error("Error:", error));
+                    });
                 });
             },
             onCancel: function(data) {
-                console.warn("Transaction was canceled by the user.");
+                console.warn("Transaction was canceled.");
             },
             onError: function(err) {
-                console.error("Error during transaction:", err);
+                console.error("Transaction error:", err);
             }
         }).render("#paypal-button-container");
     </script>
 </body>
 </html>
-
