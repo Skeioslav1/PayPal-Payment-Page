@@ -13,51 +13,49 @@
     
     <div id="paypal-button-container"></div>
     
-    <script src="https://www.paypal.com/sdk/js?client-id=AYy6HZjrCWwMG1gzVsFCUgNZnuYFFtePVmAo8zgsk9syXLfkEGLdHjTazOh427K5_Vcn5-ZPbpLIy_IT"></script>
+    <script src="https://www.paypal.com/sdk/js?client-id=YOUR_PAYPAL_CLIENT_ID"></script>
     <script>
-        // Get query parameters
-        const params = new URLSearchParams(window.location.search);
-        const deepLink = params.get("redirect") || ""; // Get deep link parameter
-        const planName = params.get("plan") || "Default Plan";
-        const amount = params.get("amount") || "1.00"; // Default to 1.00 if missing
-        const email = params.get("email") || "";
-        const tableId = params.get("table_id") || "";
-        const token = params.get("token") || "";
+        function getQueryParam(name) {
+            return new URLSearchParams(window.location.search).get(name);
+        }
 
         paypal.Buttons({
             createOrder: function(data, actions) {
                 return actions.order.create({
                     purchase_units: [{
-                        amount: { value: amount }
+                        amount: { value: getQueryParam("amount") }
                     }]
                 });
             },
             onApprove: function(data, actions) {
                 return actions.order.capture().then(function(details) {
-                    // Prepare data to send to Cloudflare Worker
-                    const paymentData = {
+                    const transactionData = {
                         email: details.payer.email_address,
                         amount: details.purchase_units[0].amount.value,
                         transaction_id: details.id,
                         paid_at: new Date().toISOString(),
-                        plan_name: planName,
-                        table_id: tableId,
-                        token: token
+                        plan_name: getQueryParam("plan"),
+                        table_id: getQueryParam("table_id"),
+                        token: getQueryParam("token"),
                     };
 
-                    // Send payment data to Cloudflare Worker
+                    // Send data to Cloudflare Worker
                     fetch("https://paypal-payment-page.alexskeioslav.workers.dev/", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(paymentData)
+                        body: JSON.stringify(transactionData),
                     })
-                    .then(response => {
-                        if (response.ok) {
-                            // Redirect to the Success Page with the deep link
-                            window.location.href = `https://skeioslav1.github.io/Success-Payment-Page/Success Page.html?redirect=${encodeURIComponent(deepLink)}`;
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Redirect to Success Page with deep link
+                            const successUrl = `https://skeioslav1.github.io/Success-Payment-Page/Success Page.html?redirect=${encodeURIComponent(getQueryParam("redirect"))}`;
+                            window.location.href = successUrl;
+                        } else {
+                            console.error("Error sending payment data:", data.error);
                         }
                     })
-                    .catch(error => console.error("Error sending data:", error));
+                    .catch(error => console.error("Error:", error));
                 });
             }
         }).render('#paypal-button-container');
